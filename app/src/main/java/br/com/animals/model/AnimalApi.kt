@@ -9,7 +9,7 @@ import retrofit2.http.POST
 interface AnimalApi {
 
     @GET("getKey")
-    fun getApiKey(): Single<Apikey>
+    fun getApiKey(): Single<ApiKey>
 
     @FormUrlEncoded
     @POST("getAnimals")

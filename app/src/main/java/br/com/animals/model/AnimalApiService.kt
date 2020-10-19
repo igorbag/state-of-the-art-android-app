@@ -16,7 +16,7 @@ class AnimalApiService {
         .build()
         .create(AnimalApi::class.java)
 
-    fun getApiKey(): Single<Apikey> {
+    fun getApiKey(): Single<ApiKey> {
         return api.getApiKey()
     }
 

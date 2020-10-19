@@ -5,7 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.MutableLiveData
 import br.com.animals.model.Animal
 import br.com.animals.model.AnimalApiService
-import br.com.animals.model.Apikey
+import br.com.animals.model.ApiKey
 import br.com.animals.util.SharedPreferencesHelper
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.CompositeDisposable
@@ -47,8 +47,8 @@ class ListViewModel(application: Application) : AndroidViewModel(application) {
         disposable.add(
             apiService.getApiKey().subscribeOn(Schedulers.newThread())
                 .observeOn(AndroidSchedulers.mainThread())
-                .subscribeWith(object : DisposableSingleObserver<Apikey>() {
-                    override fun onSuccess(key: Apikey) {
+                .subscribeWith(object : DisposableSingleObserver<ApiKey>() {
+                    override fun onSuccess(key: ApiKey) {
                         if (key.key.isNullOrEmpty()) {
                             loadError.value = true
                             loading.value = false
