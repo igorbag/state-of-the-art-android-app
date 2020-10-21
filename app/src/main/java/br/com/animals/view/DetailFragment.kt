@@ -6,30 +6,28 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.databinding.DataBindingUtil
 import androidx.fragment.app.Fragment
 import androidx.palette.graphics.Palette
 import br.com.animals.R
+import br.com.animals.databinding.FragmentDetailBinding
 import br.com.animals.model.Animal
-import br.com.animals.util.getProgressDrawable
-import br.com.animals.util.loadImage
+import br.com.animals.model.AnimalPalette
 import com.bumptech.glide.Glide
 import com.bumptech.glide.request.target.CustomTarget
 import com.bumptech.glide.request.transition.Transition
-import kotlinx.android.synthetic.main.fragment_detail.*
-import kotlinx.android.synthetic.main.fragment_detail.animalImage
-import kotlinx.android.synthetic.main.fragment_detail.animalName
-
 
 class DetailFragment : Fragment() {
 
     var animal: Animal? = null
+    private lateinit var dataBinding: FragmentDetailBinding
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
-        // Inflate the layout for this fragment
-        return inflater.inflate(R.layout.fragment_detail, container, false)
+        dataBinding = DataBindingUtil.inflate(inflater, R.layout.fragment_detail, container, false)
+        return dataBinding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -39,18 +37,12 @@ class DetailFragment : Fragment() {
             animal = DetailFragmentArgs.fromBundle(it).animal
         }
 
-        context?.let {
-            animalImage.loadImage(animal?.imageUrl, getProgressDrawable(it))
-        }
-
-        animalName.text = animal?.name
-        animalLocation.text = animal?.location
-        animalLifeSpan.text = animal?.lifeSpan
-        animalDiet.text = animal?.diet
-
         animal?.imageUrl?.let {
             setUpBackgroundColor(it)
         }
+
+        dataBinding.animal = animal
+
     }
 
     private fun setUpBackgroundColor(imageUrl: String) {
@@ -58,18 +50,15 @@ class DetailFragment : Fragment() {
             .asBitmap()
             .load(imageUrl)
             .into(object : CustomTarget<Bitmap>() {
-                override fun onResourceReady(resource: Bitmap, transition: Transition<in Bitmap>?) {
-                    Palette.from(resource)
-                        .generate { pallet ->
-                            val intColor = pallet?.lightMutedSwatch?.rgb ?: 0
-                            animalLayout.setBackgroundColor(intColor)
-                        }
-                }
-
                 override fun onLoadCleared(placeholder: Drawable?) {
-
                 }
 
+                override fun onResourceReady(resource: Bitmap, transition: Transition<in Bitmap>?) {
+                    Palette.from(resource).generate() {
+                        val intColor = it?.lightMutedSwatch?.rgb ?: 0
+                        dataBinding.palette = AnimalPalette(intColor)
+                    }
+                }
             })
     }
 }
