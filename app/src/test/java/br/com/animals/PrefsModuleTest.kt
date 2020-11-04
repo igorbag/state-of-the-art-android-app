@@ -7,7 +7,7 @@ import br.com.animals.util.SharedPreferencesHelper
 class PrefsModuleTest(val mockPrefs: SharedPreferencesHelper) : PrefsModule() {
 
     override fun provideSharedPreferences(app: Application): SharedPreferencesHelper {
-        return super.provideSharedPreferences(app)
+        return mockPrefs
     }
 
 }

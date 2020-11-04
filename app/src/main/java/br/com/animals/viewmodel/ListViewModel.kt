@@ -4,7 +4,9 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.MutableLiveData
 import br.com.animals.di.AppModule
+import br.com.animals.di.CONTEXT_APP
 import br.com.animals.di.DaggerViewModelComponent
+import br.com.animals.di.TypeOfContext
 import br.com.animals.model.Animal
 import br.com.animals.model.AnimalApiService
 import br.com.animals.model.ApiKey
@@ -17,81 +19,100 @@ import javax.inject.Inject
 
 class ListViewModel(application: Application) : AndroidViewModel(application) {
 
-    constructor(application: Application, test: Boolean = true): this(application){
-        injected = true
+    constructor(application: Application, test: Boolean = true) : this(application) {
+        injected = test
     }
 
     val animals by lazy { MutableLiveData<List<Animal>>() }
     val loadError by lazy { MutableLiveData<Boolean>() }
     val loading by lazy { MutableLiveData<Boolean>() }
 
-    private val disposable = CompositeDisposable()
-
     private var injected = false
-
-    fun inject() {
-        if(!injected)
-            DaggerViewModelComponent
-                .builder()
-                .appModule(AppModule(getApplication()))
-                .build()
-                .inject(this)
-    }
+    private var invalidApiKey = false
+    private val disposable = CompositeDisposable()
 
     @Inject
     lateinit var apiService: AnimalApiService
 
     @Inject
-    lateinit var prefs: SharedPreferencesHelper
+    @field:TypeOfContext(CONTEXT_APP)
+    lateinit var preferences: SharedPreferencesHelper
 
-    private var invalidApiKey = false
-
+    fun inject() {
+        // Check if the AnimalApiServce has been already injected (e.g. unit tests)
+        if (!injected) {
+            // Inject a new instance of the AnimalApiService
+            DaggerViewModelComponent.builder()
+                .appModule(AppModule(getApplication()))
+                .build()
+                .inject(this)
+        }
+    }
 
     fun refresh() {
+        // Call injection function
         inject()
-        loading.value = true
+
+        // Reset the flag
         invalidApiKey = false
-        val key = prefs.getApiKey()
+
+        // Show progress view
+        loading.value = true
+
+        // Get the stored key
+        val key = preferences.getApiKey()
+
         if (key.isNullOrEmpty()) {
-            getKey()
+            // Get the key
+            getApiKey()
         } else {
+            // Get animals using the stored key
             getAnimals(key)
         }
-
     }
 
     fun hardRefresh() {
+        // Call injection function
         inject()
+
+        // Show progress view
         loading.value = true
-        getKey()
+
+        // Get the key
+        getApiKey()
     }
 
-    private fun getKey() {
+    private fun getApiKey() {
         disposable.add(
-            apiService.getApiKey().subscribeOn(Schedulers.newThread())
+            apiService.getApiKey()
+                .subscribeOn(Schedulers.newThread())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribeWith(object : DisposableSingleObserver<ApiKey>() {
-                    override fun onSuccess(key: ApiKey) {
-                        if (key.key.isNullOrEmpty()) {
-                            loadError.value = true
+                    override fun onSuccess(apiKey: ApiKey) {
+                        if (apiKey.key.isNullOrEmpty()) {
                             loading.value = false
+                            loadError.value = true
                         } else {
-                            prefs.saveApiKey(key.key)
-                            getAnimals(key.key)
+                            // Store retrieved key
+                            preferences.saveApiKey(apiKey.key)
+
+                            // Get animals
+                            getAnimals(apiKey.key)
                         }
                     }
 
                     override fun onError(e: Throwable) {
                         if (!invalidApiKey) {
                             invalidApiKey = true
-                            getKey()
+
+                            // Get the key
+                            getApiKey()
                         } else {
-                            e.printStackTrace()
+                            animals.value = null
                             loading.value = false
                             loadError.value = true
                         }
                     }
-
                 })
         )
     }
@@ -103,15 +124,14 @@ class ListViewModel(application: Application) : AndroidViewModel(application) {
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribeWith(object : DisposableSingleObserver<List<Animal>>() {
                     override fun onSuccess(list: List<Animal>) {
-                        loadError.value = false
                         animals.value = list
                         loading.value = false
+                        loadError.value = false
                     }
 
                     override fun onError(e: Throwable) {
-                        e.printStackTrace()
-                        loading.value = false
                         animals.value = null
+                        loading.value = false
                         loadError.value = true
                     }
                 })
@@ -120,6 +140,7 @@ class ListViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
+
         disposable.clear()
     }
 }

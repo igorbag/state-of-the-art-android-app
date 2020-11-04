@@ -25,75 +25,105 @@ import java.util.concurrent.Executor
 
 class ListViewModelTest {
     @get:Rule
-
-    @Mock
-    lateinit var animalService: AnimalApiService
+    var rule = InstantTaskExecutorRule()
 
     @Mock
     lateinit var prefs: SharedPreferencesHelper
 
+    @Mock
+    lateinit var animalService: AnimalApiService
+
     val application = Mockito.mock(Application::class.java)
+    val listViewModel = ListViewModel(application, true)
 
-    var listViewModel = ListViewModel(application, true)
-
-    private val key = "Test key"
+    private val key = "Test Key"
 
     @Before
-    fun setUp() {
+    fun setup() {
         MockitoAnnotations.initMocks(this)
+
         DaggerViewModelComponent.builder()
             .appModule(AppModule(application))
             .apiModule(ApiModuleTest(animalService))
             .prefsModule(PrefsModuleTest(prefs))
             .build()
             .inject(listViewModel)
+    }
 
+    @Before
+    fun setupRxSchedulers() {
+        // Run before any test is executed
+        val immediate = object: Scheduler() {
+            override fun createWorker(): Worker {
+                return ExecutorScheduler.ExecutorWorker(Executor { it.run() }, true)
+            }
+        }
+
+        RxJavaPlugins.setInitNewThreadSchedulerHandler { scheduler -> immediate }
+        RxAndroidPlugins.setInitMainThreadSchedulerHandler { scheduler -> immediate }
     }
 
     @Test
     fun getAnimalSuccess() {
+        // Mock the call to method getApiKey of the class SharedPreferencesHelper
         Mockito.`when`(prefs.getApiKey()).thenReturn(key)
-        val animal = Animal("cow", null, null, null, null, null, null)
-        val aniamList = listOf(animal)
-        val testSingle = Single.just(aniamList)
+
+        val animal = Animal("Cow", null, null, null, null, null, null)
+        val animalList = listOf(animal)
+
+        val testSingle = Single.just(animalList)
+
+        // Mock the call to method getAnimals of the class AnimalApiService
         Mockito.`when`(animalService.getAnimal(key)).thenReturn(testSingle)
 
+        // Call refresh method
         listViewModel.refresh()
 
+        // Check results
         Assert.assertEquals(1, listViewModel.animals.value?.size)
         Assert.assertEquals(false, listViewModel.loadError.value)
         Assert.assertEquals(false, listViewModel.loading.value)
     }
 
     @Test
-    fun getAnimalsFailure(){
+    fun getAnimalFailure() {
+        // Mock the call to method getApiKey of the class SharedPreferencesHelper
         Mockito.`when`(prefs.getApiKey()).thenReturn(key)
+
         val testSingle = Single.error<List<Animal>>(Throwable())
         val keySingle = Single.just(ApiKey("OK", key))
 
+        // Mock the call to method getAnimals of the class AnimalApiService
         Mockito.`when`(animalService.getAnimal(key)).thenReturn(testSingle)
+
+        // Mock the call to method getApiKey of the class AnimalApiService
         Mockito.`when`(animalService.getApiKey()).thenReturn(keySingle)
 
+        // Call refresh method
         listViewModel.refresh()
 
+        // Check results
         Assert.assertEquals(null, listViewModel.animals.value)
-        Assert.assertEquals(false, listViewModel.loading.value)
         Assert.assertEquals(true, listViewModel.loadError.value)
+        Assert.assertEquals(false, listViewModel.loading.value)
     }
 
-    var rule = InstantTaskExecutorRule()
+    @Test
+    fun getApiKeyFailure() {
+        // Mock the call to method getApiKey of the class SharedPreferencesHelper
+        Mockito.`when`(prefs.getApiKey()).thenReturn(null)
 
-    @Before
-    fun setUpRxSchedulers() {
-        val immediate = object : Scheduler() {
-            override fun createWorker(): Worker {
-                return ExecutorScheduler.ExecutorWorker(Executor {
-                    it.run()
-                }, true)
-            }
-        }
+        // Mock the call to method getApiKey of the class AnimalApiService
+        val keySingle = Single.error<ApiKey>(Throwable())
 
-        RxJavaPlugins.setInitNewThreadSchedulerHandler { scheudler -> immediate }
-        RxAndroidPlugins.setInitMainThreadSchedulerHandler { scheduler -> immediate }
+        Mockito.`when`(animalService.getApiKey()).thenReturn(keySingle)
+
+        // Call refresh method
+        listViewModel.refresh()
+
+        // Check results
+        Assert.assertEquals(null, listViewModel.animals.value)
+        Assert.assertEquals(true, listViewModel.loadError.value)
+        Assert.assertEquals(false, listViewModel.loading.value)
     }
 }
